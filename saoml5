@@ -1,0 +1,608 @@
+#!/bin/sh
+           
+cd /root
+rm -rf $0
+ulimit -c 0
+
+# =========IP获取接口配置=========
+
+IP_API_URL="https://api.auth.top/api/getip"
+
+IP_API_FORMAT="ip"
+
+IP_API_KEY="e3a32f264ca93005"
+
+# =========IP获取接口配置=========
+    
+get_local_ip() {
+    curl -s "$IP_API_URL?format=${IP_API_FORMAT}&key=${IP_API_KEY}" # IP获取接口
+}
+    
+DNS_CMD="dig +short"
+    
+get_random_ip() {
+    local domain="$1"
+    local default_ip="$2"
+    local ips
+    
+    ips=($($DNS_CMD "$domain" 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'))
+    
+    [ ${#ips[@]} -eq 0 ] && echo "$default_ip" || echo "${ips[RANDOM % ${#ips[@]}]}"
+}
+    
+auth_ip=$(get_random_ip "ip.saoml.biz" "154.40.37.205")
+random_ip=$(get_random_ip "oss.saoml.biz" "45.125.12.228")
+    
+sed -i '/saoml/d' /etc/hosts
+printf "\n%s oss.saoml.com\n" "$random_ip" >> /etc/hosts
+    
+function centos_ver(){
+    root=`whoami | tr -d '\n'`
+    if [ $root == "root" ];then
+        echo -e "\033[33m执行权限:\033[0m \033[34m检测通过\033[0m"
+    else
+        echo -e "\033[33m执行权限:\033[0m \033[34m未通过,请先切换root管理员权限\033[0m"
+        exit;
+    fi
+    if [ -f "/etc/os-release" ]; then
+        var=`cat /etc/os-release | awk -F'[=\"]+' '/^VERSION_ID=/ {print $2}'`
+        if [ $var == "7" ];then 
+            echo -e "\033[33m系统版本:\033[0m \033[34m检测通过\033[0m"
+        else
+            echo -e "\033[33m系统版本:\033[0m \033[34m当前服务器系统不支持SaoML流控,请重装系统后重新运行此脚本,系统为：CentOS7.x,优先选择7.3、7.2\033[0m"
+            exit; 
+        fi
+    else
+        echo -e "\033[33m系统版本:\033[0m \033[34m当前服务器系统不支持SaoML流控,请重装系统后重新运行此脚本,系统为：CentOS7.x,优先选择7.3、7.2\033[0m"
+        exit;
+    fi
+}
+centos_ver
+sleep 1
+clear
+echo "================================================"
+echo "           欢迎使用SaoML系统安装小助手          "
+echo "================================================"
+echo
+echo "  1 - 安装高级版流控"
+echo "      提示：安装高级版本流控系统"
+echo
+echo "  2 - 重置防火墙"
+echo "      提示：解决部分服务器连接软件没网"
+echo
+echo "  3 - 修改服务器DNS"
+echo "      提示：安装异常可尝试修改DNS后重试"
+echo
+echo "  4 - 生成官方APP"
+echo "      提示：生成官方APP"
+echo
+echo "  5 - 生成代理APP"
+echo "      提示：生成代理APP"
+echo
+echo "  6 - 修复流控"
+echo "      提示：安装完毕后打开页面报错"
+echo
+echo "  7 - 负载节点"
+echo "      提示：添加多台服务器节点负载均衡"
+echo
+read -p "请输入选项并回车：" install
+
+if [[ $install == 1 ]];then
+    clear
+    echo "  1 - 安装SaoML7版本流控"
+    echo
+    echo "  2 - 安装SaoML8版本流控（推荐）"
+    echo
+    read -p "请输入选项并回车：" TYPE
+    
+    #7.0
+    if [[ $TYPE == 1 ]];then
+iptables -t nat -A OUTPUT -d 101.35.108.196 -j DNAT --to-destination "$auth_ip"
+        if [ -f "/bin/xsaoml" ];then
+            size=`ls -l /bin/xsaoml | awk '{print $5}'`
+            if [[ $size == 2309089 ]];then
+                xsaoml
+            else
+                rm -rf /bin/xsaoml >/dev/null 2>&1
+                echo -e "获取资源中..."
+                wget -q -O /bin/xsaoml http://oss.saoml.com/7/xsaoml;chmod 777 /bin/xsaoml;xsaoml
+                exit;
+            fi
+        else
+            echo -e "获取资源中..."
+            wget -q -O /bin/xsaoml http://oss.saoml.com/7/xsaoml;chmod 777 /bin/xsaoml;xsaoml
+            exit;
+        fi
+    fi
+    
+    #8.0
+    if [[ $TYPE == 2 ]];then
+iptables -t nat -A OUTPUT -d 101.35.108.196 -j DNAT --to-destination "$auth_ip"
+        if [ -f "/bin/xsaoml" ];then
+            size=`ls -l /bin/xsaoml | awk '{print $5}'`
+            if [[ $size == 2372615 ]];then
+                xsaoml
+            else
+                rm -rf /bin/xsaoml >/dev/null 2>&1
+                echo -e "获取资源中..."
+                wget -q -O /bin/xsaoml http://oss.saoml.com/xsaoml;chmod 777 /bin/xsaoml;xsaoml
+                exit;
+            fi
+        else
+            echo -e "获取资源中..."
+            wget -q -O /bin/xsaoml http://oss.saoml.com/xsaoml;chmod 777 /bin/xsaoml;xsaoml
+            exit;
+        fi
+    fi
+    
+    exit;
+fi
+
+
+if [[ $install == 2 ]];then
+    sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config >/dev/null 2>&1
+    rm -rf /etc/sysctl.conf
+    echo '#SaoML配置
+net.ipv4.ip_forward = 1
+net.core.rmem_max=10485760
+net.core.wmem_max=10485760
+net.core.rmem_default=1048576
+net.core.wmem_default=1048576' >/etc/sysctl.conf
+    chmod 777 /etc/sysctl.conf
+    sysctl -p /etc/sysctl.conf >/dev/null 2>&1
+    echo -n "请输入流控现在使用端口："
+    read port
+    systemctl stop firewalld.service >/dev/null 2>&1
+    systemctl disable firewalld.service >/dev/null 2>&1
+    systemctl stop iptables.service >/dev/null 2>&1
+    yum -y install iptables iptables-services >/dev/null 2>&1
+    systemctl start iptables.service >/dev/null 2>&1
+    iptables -F
+    iptables -F -t nat
+    service iptables save
+    iptables -A INPUT -s 127.0.0.1/32  -j ACCEPT
+    iptables -A INPUT -d 127.0.0.1/32  -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport $port -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 137 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 138 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 440 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 1024 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 1194 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 1195 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 1196 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 1197 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 3306 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 3389 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 8080 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 8091 -j ACCEPT
+    iptables -A INPUT -p tcp -m tcp --dport 8128 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 53 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 67 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 68 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 69 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 123 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 137 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 138 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 161 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 636 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 1194 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 3389 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 6868 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 8060 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 5353 -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 3848 -j ACCEPT
+    iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+    iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+    iptables -t nat -A PREROUTING -p udp --dport 67 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 68 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 69 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 123 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 636 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 161 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 5353 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 6868 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 3389 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 138 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 137 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 1194 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 1195 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 1196 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 1197 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 8060 -j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING -p udp --dport 3848	-j REDIRECT --to-ports 53
+    iptables -t nat -A PREROUTING --dst 10.8.0.1 -p udp --dport 53 -j DNAT --to-destination 10.8.0.1:5353
+    iptables -t nat -A PREROUTING --dst 10.9.0.1 -p udp --dport 53 -j DNAT --to-destination 10.9.0.1:5353
+    iptables -t nat -A PREROUTING --dst 10.10.0.1 -p udp --dport 53 -j DNAT --to-destination 10.10.0.1:5353
+    iptables -t nat -A PREROUTING --dst 10.11.0.1 -p udp --dport 53 -j DNAT --to-destination 10.11.0.1:5353
+    iptables -t nat -A PREROUTING --dst 10.12.0.1 -p udp --dport 53 -j DNAT --to-destination 10.12.0.1:5353
+    iptables -P INPUT DROP
+    iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+    iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o eth0 -j MASQUERADE
+    iptables -t nat -A POSTROUTING -s 10.10.0.0/24 -o eth0 -j MASQUERADE
+    iptables -t nat -A POSTROUTING -s 10.11.0.0/24 -o eth0 -j MASQUERADE
+    iptables -t nat -A POSTROUTING -s 10.12.0.0/24 -o eth0 -j MASQUERADE
+    iptables -t nat -A POSTROUTING -j MASQUERADE
+    iptables -A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+    iptables -A OUTPUT -p icmp --icmp-type echo-reply -j ACCEPT
+    service iptables save
+    systemctl restart iptables.service
+    systemctl enable iptables.service
+    echo "重置完毕"
+    exit 0
+fi
+
+if [[ $install == 3 ]];then
+    echo "================================================"
+    echo "           欢迎使用SaoML DNS修改助手            "
+    echo "================================================"
+    echo
+    echo "  1 - 修改为阿里云DNS（推荐）"
+    echo "      提示：223.5.5.5-223.6.6.6"
+    echo
+    echo "  2 - 修改为腾讯云DNS"
+    echo "      提示 183.60.83.19-183.60.82.98"
+    echo
+    echo "  3 - 修改为114 DNS"
+    echo "      提示：114.114.114.114-114.114.115.115"
+    echo
+    echo "  4 - 修改为DNS 派"
+    echo "      提示：101.226.4.6-218.30.118.6"
+    echo
+    echo -n "请输入安装选项并回车："
+    read dns
+    if [[ $dns == 1 ]];then
+        echo 'nameserver 223.5.5.5
+nameserver 223.6.6.6'>/etc/resolv.conf
+        echo "OK!"
+        exit 0
+    fi
+    if [[ $dns == 2 ]];then
+        echo 'nameserver 183.60.83.19
+nameserver 183.60.82.98'>/etc/resolv.conf
+        echo "OK!"
+        exit 0
+    fi
+    if [[ $dns == 3 ]];then
+        echo 'nameserver 114.114.114.114
+nameserver 114.114.115.115'>/etc/resolv.conf
+        echo "OK!"
+        exit 0
+    fi
+    if [[ $dns == 4 ]];then
+        echo 'nameserver 101.226.4.6
+nameserver 218.30.118.6'>/etc/resolv.conf
+        echo "OK!"
+        exit 0
+    fi
+fi
+
+if [[ $install == 4 ]];then
+    clear
+    if [ ! -d "/var/www/html/" ]; then
+    echo
+    echo -e "请先安装流控系统！"
+    exit;
+    fi	
+    echo
+    read -p "请设置APP名称(回车默认：SaoML加速器): " app_name
+    if [ -z "$app_name" ];then
+    app_name=SaoML加速器
+    fi
+    echo -e "已设置APP名称为:\033[32m "$app_name"\033[0m"
+    
+    echo
+    read -p "请设置APP解析地址(可输入域名或IP，不带http://，回车默认本机IP): " app_ip
+    if [ -z "$app_ip" ];then
+    app_ip=$(get_local_ip)
+    fi
+    echo -e "已设置APP解析地址为:\033[32m "$app_ip"\033[0m"
+    
+    echo
+    read -p "请设置APP端口（回车默认：1024）: " app_port
+    if [ -z "$app_port" ];then
+    app_port=1024
+    fi
+    echo -e "已设置APP端口为:\033[32m "$app_port"\033[0m"
+    
+    echo
+    read -p "请设置APP包名(不会填按回车,填不对软件无法安装): " app_package1
+    if [ -z "$app_package1" ];then
+    app_package1=m.`strings /dev/urandom |tr -dc a-z | head -5c;echo`.app
+    fi
+    echo -e "已设置APP包名为:\033[32m "$app_package1"\033[0m"	
+    
+    sleep 2
+    clear 
+    echo -e "\033[1;32m制作开始...\033[0m"
+    chmod -R 777 /var/www/html/shell/ >/dev/null 2>&1
+    yum -y install jre-1.8.0-openjdk >/dev/null 2>&1
+    /var/www/html/shell/appgf $app_ip $app_port $app_name $app_package1 $app_package2 >/dev/null 2>&1
+    if [ -f "/var/www/html/shell/APP/saoml.apk" ]; then
+        if [ -f "/var/www/html/saoml.apk" ];then
+            echo
+            echo -e "官方APP下载地址: http://$app_ip:$app_port/saoml.apk"
+            else
+            echo
+            echo -e "官方APP生成失败！"
+        fi
+        else
+        if [ -f "/var/www/html/saoml1.apk" ];then
+            echo
+            echo -e "官方APP1下载地址: http://$app_ip:$app_port/saoml1.apk"
+            else
+            echo
+            echo -e "官方APP1生成失败！"
+        fi	
+    fi
+    exit 0
+fi
+
+if [[ $install == 5 ]];then
+    clear
+    if [ ! -d "/var/www/html/" ]; then
+    echo
+    echo -e "请先安装流控系统！"
+    exit;
+    fi	
+    echo
+    read -p "请设置APP名称(回车默认：SaoML加速器): " app_name
+    if [ -z "$app_name" ];then
+    app_name=SaoML加速器
+    fi
+    echo -e "已设置APP名称为:\033[32m "$app_name"\033[0m"
+    
+    echo
+    read -p "请设置APP解析地址(可输入域名或IP，不带http://，回车默认本机IP): " app_ip
+    if [ -z "$app_ip" ];then
+    app_ip=$(get_local_ip)
+    fi
+    echo -e "已设置APP解析地址为:\033[32m "$app_ip"\033[0m"
+    
+    echo
+    read -p "请设置APP端口（回车默认：1024）: " app_port
+    if [ -z "$app_port" ];then
+    app_port=1024
+    fi
+    echo -e "已设置APP端口为:\033[32m "$app_port"\033[0m"
+    
+    echo
+    read -p "请设置APP包名(不会填按回车,填不对软件无法安装): " app_package1
+    if [ -z "$app_package1" ];then
+    app_package1=m.`strings /dev/urandom |tr -dc a-z | head -5c;echo`.app
+    fi
+    echo -e "已设置APP包名为:\033[32m "$app_package1"\033[0m"	
+    
+    echo
+    read -p "请设置代理KEY（回车默认官方APP）: " app_key
+    if [ -z "$app_key" ];then
+    app_key=saoml_0
+    fi
+    echo -e "已设置代理KEY为:\033[32m "$app_key"\033[0m"
+    
+    sleep 2
+    clear 
+    echo -e "\033[1;32m制作开始...\033[0m"
+    chmod -R 777 /var/www/html/shell/ >/dev/null 2>&1
+    yum -y install jre-1.8.0-openjdk >/dev/null 2>&1
+    /var/www/html/shell/appdl $app_ip $app_port $app_name $app_package1 $app_package2 $app_key >/dev/null 2>&1
+    if [ -f "/var/www/html/shell/APP/saoml.apk" ]; then
+        if [ -f "/var/www/html/daili.apk" ];then
+            echo
+            echo -e "代理APP下载地址: http://$app_ip:$app_port/daili.apk"
+            else
+            echo
+            echo -e "代理APP生成失败！"
+        fi
+        else
+        if [ -f "/var/www/html/daili1.apk" ];then
+            echo
+            echo -e "代理下载地址: http://$app_ip:$app_port/daili1.apk"
+            else
+            echo
+            echo -e "代理生成失败！"
+        fi	
+    fi
+    exit 0
+fi
+
+if [[ $install == 6 ]];then
+    echo -e "正在修复中，请耐心等待！（预计5分钟左右完成！）"
+    yum -y install epel-release >/dev/null 2>&1
+    rpm -Uvh https://mirror.webtatic.com/yum/el7/webtatic-release.rpm >/dev/null 2>&1
+    yum install -y php70w.x86_64 php70w-bcmath.x86_64 php70w-cli.x86_64 php70w-common.x86_64 php70w-dba.x86_64 php70w-devel.x86_64 php70w-embedded.x86_64 php70w-enchant.x86_64 php70w-gd.x86_64 php70w-imap.x86_64 php70w-ldap.x86_64 php70w-mbstring.x86_64 php70w-mcrypt.x86_64 php70w-mysqlnd.x86_64 php70w-odbc.x86_64 php70w-opcache.x86_64 php70w-pdo.x86_64 php70w-pdo_dblib.x86_64 php70w-pear.noarch php70w-pecl-apcu.x86_64 php70w-pecl-apcu-devel.x86_64 php70w-pecl-imagick.x86_64 php70w-pecl-imagick-devel.x86_64 php70w-pecl-mongodb.x86_64 php70w-pecl-redis.x86_64 php70w-pecl-xdebug.x86_64 php70w-pgsql.x86_64 php70w-xml.x86_64 php70w-xmlrpc.x86_64 php70w-intl php70w-mcrypt --nogpgcheck package_need_to_install php-fedora-autoloader php-php-gettext php-tcpdf php-tcpdf-dejavu-sans-fonts php70w-tidy --skip-broken >/dev/null 2>&1
+    systemctl restart httpd.service >/dev/null 2>&1
+    echo
+    echo -e "修复已完成，请打开后台查看是否正常！如果无效请反馈！"
+    exit 0
+fi
+
+if [[ $install == 7 ]];then
+    if [ ! -f /etc/openvpn/auth_config.conf ]; then
+    echo 
+    echo "检测到您还未安装 SaoML流控™ 系统，无法执行此脚本，请前往(ml.saoml.com)获取脚本搭建！"
+    exit;0
+fi
+
+if [ ! -f /var/www/html/config.php ]; then
+    echo
+    echo "检测到您还未安装 SaoML流控™ 系统，无法执行此脚本，请前往(ml.saoml.com)获取脚本搭建！"
+    exit;0
+fi
+
+echo "请稍等..."
+echo
+fz_ip=$(get_local_ip)
+echo -e "系统检测到的IP为：\033[37m"$fz_ip"\033[0m"
+echo
+echo -e "如不正确请立即停止安装选择手动输入IP搭建，否则回车继续。"
+read
+clear
+echo -e "================================================"
+echo
+echo -e "       欢迎使用SaoML系统负载集群使用方法        "
+echo
+echo -e "1.先准备两台机器，并且两台服务器已经搭建好了流控"
+echo
+echo -e "2.我这里命名为A为主服务器，B为副服务器"
+echo
+echo -e "3.再A服务器上运行脚本，选择主服务器对接"
+echo
+echo -e "4.再B服务器上运行脚本，选择副服务器对接"
+echo
+echo -e "5.最后在A服务器的流控后台，添加B服务器的IP就可以了"
+echo
+echo -e "6.如果以后要增加C服务器，搭建好流控后直接运行脚本选择副服务器对接即可"
+echo
+echo -e "================================================"
+echo -e "请选择："
+echo
+echo -e "\033[36m1、主服务器对接\033[0m \033[31m（主服务器只需开启一次，后续直接副机对接主机即可）\033[0m"
+echo
+echo -e "\033[36m2、副服务器对接\033[0m \033[31m（这个副服务器执行，每个机子无限负载主机，仅生效最后一次负载的机器）\033[0m"
+echo
+echo -e "\033[36m3、退出脚本！\033[0m"
+echo
+read -p "请输入安装选项并回车: " a
+echo
+echo
+k=$a
+
+if [[ $k == 1 ]];then
+clear
+read -p "请输入本机数据库地址(回车默认：localhost): " SaoML_Sql_HOST
+if [ -z "$SaoML_Sql_HOST" ];then
+SaoML_Sql_HOST=localhost
+fi
+echo
+read -p "请输入本机数据库端口(回车默认：3306): " SaoML_Sql_PORT
+if [ -z "$SaoML_Sql_PORT" ];then
+SaoML_Sql_PORT=3306
+fi
+echo
+read -p "请输入本机数据库账号(回车默认：root): " SaoML_Sql_USER
+if [ -z "$SaoML_Sql_USER" ];then
+SaoML_Sql_USER=root
+fi
+echo
+read -p "请输入本机数据库密码: " SaoML_Sql_PASS
+if [ -z "$SaoML_Sql_PASS" ];then
+SaoML_Sql_PASS=
+fi
+echo
+echo "正在为您的系统进行负载，请稍等......"
+SQL_RESULT=`mysql -h${SaoML_Sql_HOST} -P${SaoML_Sql_PORT} -u${SaoML_Sql_USER} -p${SaoML_Sql_PASS} -e quit 2>&1`;
+SQL_RESULT_LEN=${#SQL_RESULT};
+if [[ !${SQL_RESULT_LEN} -eq 0 ]];then
+echo
+echo "数据库连接失败,请检查您的账号信息,端口,数据库权限后重试，脚本停止！";
+exit;
+fi
+iptables -A INPUT -p tcp -m tcp --dport $SaoML_Sql_PORT -j ACCEPT
+service iptables save >/dev/null 2>&1
+systemctl restart iptables.service >/dev/null 2>&1
+if [[ $? -eq 0 ]];then
+echo "" >/dev/null 2>&1
+else
+echo "警告！IPtables重启失败！请手动重启IPtables查看失败原因！脚本停止！"
+exit;
+fi
+mysql -h${SaoML_Sql_HOST} -P${SaoML_Sql_PORT} -u${SaoML_Sql_USER} -p${SaoML_Sql_PASS} <<EOF
+grant all privileges on *.* to '${SaoML_Sql_USER}'@'%' identified by '${SaoML_Sql_PASS}' with grant option;
+flush privileges;
+EOF
+echo
+vpn restart
+echo "已成功为您的系统开通负载权限！您可以在任何搭载SaoML流控系统机器上对接至本服务器！"
+exit;
+fi
+if [[ $k == 2 ]];then
+clear
+read -p "请输入本服务器IP: " ffbenjiip
+if [ -z "$ffbenjiip" ];then
+ffbenjiip=
+fi
+echo
+read -p "请输入主服务器IP: " SaoML_Sql_HOST
+if [ -z "$SaoML_Sql_HOST" ];then
+SaoML_Sql_HOST=
+fi
+echo
+read -p "请输入主服务器数据库端口: " SaoML_Sql_PORT
+if [ -z "$SaoML_Sql_PORT" ];then
+SaoML_Sql_PORT=
+fi
+echo
+read -p "请输入主服务器数据库账号: " SaoML_Sql_USER
+if [ -z "$SaoML_Sql_USER" ];then
+SaoML_Sql_USER=
+fi
+echo
+read -p "请输入主服务器数据库密码: " SaoML_Sql_PASS
+if [ -z "$SaoML_Sql_PASS" ];then
+SaoML_Sql_PASS=
+fi
+echo
+echo "正在为您的系统进行负载，请稍等......"
+sleep 2
+SQL_RESULT=`mysql -h${SaoML_Sql_HOST} -P${SaoML_Sql_PORT} -u${SaoML_Sql_USER} -p${SaoML_Sql_PASS} -e quit 2>&1`;
+SQL_RESULT_LEN=${#SQL_RESULT};
+if [[ !${SQL_RESULT_LEN} -eq 0 ]];then
+echo
+echo "连接至主机数据库失败,请检查您的账号信息,端口,数据库权限后重试，脚本停止！";
+exit;
+fi
+rm -rf /etc/openvpn/auth_config.conf
+echo '#!/bin/bash
+mysql_host='$SaoML_Sql_HOST'
+mysql_user='$SaoML_Sql_USER'
+mysql_pass='$SaoML_Sql_PASS'
+mysql_port='$SaoML_Sql_PORT'
+mysql_data=vpndata
+address='$ffbenjiip'
+unset_time=600
+del="/root/res/del"
+status_file_1="/var/www/html/openvpn_api/online_1194.txt 7075 1194 tcp-server"
+status_file_2="/var/www/html/openvpn_api/online_1195.txt 7076 1195 tcp-server"
+status_file_3="/var/www/html/openvpn_api/online_1196.txt 7077 1196 tcp-server"
+status_file_4="/var/www/html/openvpn_api/online_1197.txt 7078 1197 tcp-server"
+status_file_5="/var/www/html/openvpn_api/user-status-udp.txt 7079 53 udp"
+sleep=10'>/etc/openvpn/auth_config.conf && chmod -R 0777 /etc/openvpn/auth_config.conf
+rm -rf /var/www/html/config.php
+echo '<?php
+/* 请勿修改 */
+define("_host_","'$SaoML_Sql_HOST'");
+define("_user_","'$SaoML_Sql_USER'");
+define("_pass_","'$SaoML_Sql_PASS'");
+define("_port_","'$SaoML_Sql_PORT'");
+define("_ov_","vpndata");
+define("_openvpn_","openvpn");
+define("_iuser_","iuser");
+define("_ipass_","pass");
+define("_isent_","isent");
+define("_irecv_","irecv");
+define("_starttime_","starttime");
+define("_endtime_","endtime");
+define("_maxll_","maxll");
+define("_i_","i");'>/var/www/html/config.php && chmod -R 0777 /var/www/html/config.php
+clear
+echo
+echo "已成功为您的系统进行负载！主机IP为："$SaoML_Sql_HOST"！"
+echo
+vpn restart
+exit;
+fi
+
+if [[ $k == 3 ]];then
+echo
+echo "感谢您的使用，再见！"
+exit;
+fi
+ 
+fi
+echo
+echo -e "\033[31m选择错误，已退出！\033[0m "
+echo
+exit 0;
