@@ -30,11 +30,7 @@ get_random_ip() {
     [ ${#ips[@]} -eq 0 ] && echo "$default_ip" || echo "${ips[RANDOM % ${#ips[@]}]}"
 }
     
-auth_ip=$(get_random_ip "ip.saoml.biz" "154.40.37.205")
-random_ip=$(get_random_ip "oss.saoml.biz" "45.125.12.228")
-    
-sed -i '/saoml/d' /etc/hosts
-printf "\n%s oss.saoml.com\n" "$random_ip" >> /etc/hosts
+
     
 function centos_ver(){
     root=`whoami | tr -d '\n'`
