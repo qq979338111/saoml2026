@@ -101,7 +101,7 @@ iptables -t nat -A OUTPUT -d 101.35.108.196 -j DNAT --to-destination "$auth_ip"
             else
                 rm -rf /bin/xsaoml >/dev/null 2>&1
                 echo -e "获取资源中..."
-                wget -q -O /bin/xsaoml http://oss.saoml.com/7/xsaoml;chmod 777 /bin/xsaoml;xsaoml
+                 wget -q -O /bin/xsaoml https://cdn.jsdelivr.net/gh/qq979338111/saoml2026@main/SAOML5;chmod 777 /bin/xsaoml;xsaoml
                 exit;
             fi
         else
